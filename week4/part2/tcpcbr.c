@@ -35,30 +35,41 @@ int main(int argc, char* argv[]) {
         perror("connect");
         return 1;
     }
-
-    // send data to server at constant Mega-bytes-per-second 
     printf("Sending data at %f MBps...\n", atof(argv[1]));
-    float mega_byte_per_sec = atof(argv[1]);
-    int packet_size = 2048 - 0x42;
-    float packet_per_sec = mega_byte_per_sec * 1024 * 1024 / (packet_size + 0x42);
-    float usec_per_packet = 1000000 / packet_per_sec;
-    char buf[packet_size];
-    memset(buf, 1, sizeof(buf));
+    float target_byte_per_ms = atof(argv[1]) * 1000 * 1000 / 1000.0;
+    int chunk_size = 1024;
+    char chunk[chunk_size];
+    int total_sent = 0;
+    struct timeval start, end;
+
+    memset(chunk, 0, chunk_size);
+    gettimeofday(&start, NULL);
     while (1) {
-        // get the time differnece to get more accurate packet sending rate
-        struct timeval t0, t1;
-        gettimeofday(&t0, NULL);
-        if (send(sock, buf, packet_size, 0) < 0) {
+        gettimeofday(&end, NULL);
+        float elapsed = (end.tv_sec - start.tv_sec) * 1000.0 + (end.tv_usec - start.tv_usec) / 1000.0;
+       
+        if (elapsed > 1000) {
+            printf("[>] Sent %d bytes in %f ms, %f MBpms\n", total_sent, elapsed, total_sent / elapsed * 1000 / 1000);
+            total_sent = 0;
+            gettimeofday(&start, NULL);
+            continue;;
+        }
+
+        // sleep if the sending rate is too fast
+        if (total_sent / elapsed > target_byte_per_ms) {
+            struct timespec ts = {0, 1000};
+            nanosleep(&ts, NULL);
+            continue;
+        }
+
+        int sent = send(sock, chunk, chunk_size, 0);
+        if (sent < 0) {
             perror("send");
             return 1;
         }
-        gettimeofday(&t1, NULL);
-        int usec = (t1.tv_sec - t0.tv_sec) * 1000000 + (t1.tv_usec - t0.tv_usec);
-        if (usec < round(usec_per_packet)) {
-            // convert us to ns
-            struct timespec t = { 0, ((int) round(usec_per_packet - usec)) * 1000 };
-            nanosleep(&t, NULL);
-        }
+        total_sent += sent + 0x30;
     }
+
+
     return 0;
 }
