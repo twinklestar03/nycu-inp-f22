@@ -37,7 +37,7 @@ int main(int argc, char* argv[]) {
     }
     printf("Sending data at %f MBps...\n", atof(argv[1]));
     float target_byte_per_ms = atof(argv[1]) * 1000 * 1000 / 1000.0;
-    int chunk_size = 1024;
+    int chunk_size = 1000;
     char chunk[chunk_size];
     int total_sent = 0;
     struct timeval start, end;
@@ -48,7 +48,7 @@ int main(int argc, char* argv[]) {
         gettimeofday(&end, NULL);
         float elapsed = (end.tv_sec - start.tv_sec) * 1000.0 + (end.tv_usec - start.tv_usec) / 1000.0;
        
-        if (elapsed > 1000) {
+        if (elapsed >= 999.99) {
             printf("[>] Sent %d bytes in %f ms, %f MBpms\n", total_sent, elapsed, total_sent / elapsed * 1000 / 1000);
             total_sent = 0;
             gettimeofday(&start, NULL);
@@ -57,7 +57,7 @@ int main(int argc, char* argv[]) {
 
         // sleep if the sending rate is too fast
         if (total_sent / elapsed > target_byte_per_ms) {
-            struct timespec ts = {0, 1000};
+            struct timespec ts = {0, 100};
             nanosleep(&ts, NULL);
             continue;
         }
@@ -67,7 +67,7 @@ int main(int argc, char* argv[]) {
             perror("send");
             return 1;
         }
-        total_sent += sent + 0x30;
+        total_sent += sent + 0x32;
     }
 
 
