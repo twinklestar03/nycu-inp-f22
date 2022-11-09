@@ -48,7 +48,7 @@ private:
     int socketFd;
 
     // can improve proformance by using worker model
-    unique_ptr<CommandHander> pCommandHander;
+    unique_ptr<CommandHandler> pCommandHander;
 
     map<int, shared_ptr<User>> connectionMap;
     map<string, shared_ptr<User>> nickMap;

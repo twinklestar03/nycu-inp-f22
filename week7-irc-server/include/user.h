@@ -25,8 +25,8 @@ public:
 private:
     bool isRegistered = false;
     int connFd;
-    string username;
-    string nickname;
-    string realname;
-    string hostname;
+    string username = "";
+    string nickname = "";
+    string realname = "";
+    string hostname = "";
 };

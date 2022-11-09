@@ -1,5 +1,6 @@
 #include "user.h"
 
+#include <iostream>
 
 User::User(int fd, string hostname) {
     this->connFd = fd;

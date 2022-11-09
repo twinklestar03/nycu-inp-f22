@@ -13,7 +13,7 @@ using namespace std;
 
 
 TIrcd::TIrcd() {
-    pCommandHander = make_unique<CommandHander>();
+    pCommandHander = make_unique<CommandHandler>();
 }
 
 TIrcd::~TIrcd() {
@@ -88,7 +88,7 @@ int TIrcd::ReceiveMessages(int fd) {
         return -1;
     }
 
-    // read until clrf
+    // read until crlf
     string buffer;
     char c;
     int nread;
@@ -177,7 +177,7 @@ void TIrcd::RegisterConnection(int fd) {
 
     // get client ip address
     string hostname = string(inet_ntoa(addr.sin_addr));
-    connectionMap[connFd] = make_shared<User>(connFd, string(hostname));
+    connectionMap[connFd] = make_shared<User>(connFd, hostname);
     cout << "[*] New connection from " << hostname << ":" << ntohs(addr.sin_port) << endl;
 }
 

@@ -15,11 +15,11 @@ shared_ptr<User> Message::GetSender() {
     return sender;
 }
 
-string Message::GetCommand() {
+string& Message::GetCommand() {
     return command;
 }
 
-vector<string> Message::GetParams() {
+vector<string>& Message::GetParams() {
     return params;
 }
 
@@ -96,7 +96,7 @@ const string ResponseMessage::ComposeString() {
         cout << "[DEBUG][ResponseMessage::ComposeString()] [Server] ->" << ret << endl;
         return ret;
     }
-
+    
     // Client Message
     ret += ":" + sender->GetNickname() + " " + command;
     for (auto it = params.begin(); it != params.end(); ++it) {

@@ -14,8 +14,8 @@ public:
     ~Message();
 
     shared_ptr<User> GetSender();
-    string GetCommand();
-    vector<string> GetParams();
+    string& GetCommand();
+    vector<string>& GetParams();
 
     // compose the message into a string
     virtual const string ComposeString();
