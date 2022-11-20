@@ -27,10 +27,12 @@ public:
     void                EnqueueMessage(unique_ptr<ResponseMessage> pResponseMessage);
     void                EnqueueMessage(vector<unique_ptr<ResponseMessage> > pResponseMessages);
     bool                IsNicknameInUse(string nickname);
+    void                UpdateNickMap(shared_ptr<User> pUser);
     map<int, shared_ptr<User>>  GetConnectionMap();
     int                 GetUsersCount();
     vector<Channel>     GetChannelList();
     Channel&            CreateOrGetChannel(string channelName);
+    bool                IsChannelExists(string channelName);
 
 private:
     TIrcd();

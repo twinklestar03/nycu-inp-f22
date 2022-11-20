@@ -44,6 +44,14 @@ bool Channel::HasTopic() {
     return false;
 }
 
+bool Channel::IsUserInChannel(shared_ptr<User> pUser) {
+    auto it = find(users.begin(), users.end(), pUser);
+    if (it != users.end()) {
+        return true;
+    }
+    return false;
+}
+
 string Channel::GetTopic() {
     return topic;
 }

@@ -22,6 +22,7 @@ public:
     string GetUserList();
     string GetTopic();
     bool HasTopic();
+    bool IsUserInChannel(shared_ptr<User> pUser);
     
 private:
     vector<shared_ptr<User>> users;

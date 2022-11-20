@@ -58,14 +58,25 @@ void HandleNick(unique_ptr<RequestMessage> message) {
     shared_ptr<User> sender = message->GetSender();
     unique_ptr<ResponseMessage> response;
     if (params.size() != 1) {
-            response = make_unique<ResponseMessage>(
-                sender,
-                ResponseMessage::ResponseCode::ERR_NEEDMOREPARAMS,
-                vector<string>{"NICK", "Not enough parameters"});
-            TIrcd::GetInstance().EnqueueMessage(move(response));
-            return;
-        }
+        response = make_unique<ResponseMessage>(
+            sender,
+            ResponseMessage::ResponseCode::ERR_NONICKNAMEGIVEN,
+            vector<string>{"NICK", "No nickname given"});
+        TIrcd::GetInstance().EnqueueMessage(move(response));
+        return;
+    }
+
+    if (TIrcd::GetInstance().IsNicknameInUse(params[0])) {
+        response = make_unique<ResponseMessage>(
+            sender,
+            ResponseMessage::ResponseCode::ERR_NICKCOLLISION,
+            vector<string>{"NICK", params[0], "Nickname is already in use"});
+        TIrcd::GetInstance().EnqueueMessage(move(response));
+        return;
+    }
+
     sender->SetNickname(params[0]);
+    TIrcd::GetInstance().UpdateNickMap(sender);
     return;
 }
 
@@ -193,13 +204,31 @@ void HandlePart(unique_ptr<RequestMessage> message) {
     }
 
     // leave channel
+    if (!TIrcd::GetInstance().IsChannelExists(channelName)) {
+        response = make_unique<ResponseMessage>(
+            sender,
+            ResponseMessage::ResponseCode::ERR_NOSUCHCHANNEL,
+            vector<string>{channelName, "No such channel"});
+            TIrcd::GetInstance().EnqueueMessage(move(response));
+            return;
+    }
     Channel& channel = TIrcd::GetInstance().CreateOrGetChannel(channelName);
+    if (!channel.IsUserInChannel(sender)) {
+        response = make_unique<ResponseMessage>(
+            sender,
+            ResponseMessage::ResponseCode::ERR_NOTONCHANNEL,
+            vector<string>({channelName, "Not on channel"}));
+        TIrcd::GetInstance().EnqueueMessage(move(response));
+        return;
+    }
+
     channel.LeaveUser(sender);
-    response = make_unique<ResponseMessage>(
+    vector<unique_ptr<ResponseMessage>> responses;
+    responses.push_back(make_unique<ResponseMessage>(
         sender,
         "PART",
-        vector<string>({":" + channelName}));
-    TIrcd::GetInstance().EnqueueMessage(move(response));
+        vector<string>({channelName})));
+    TIrcd::GetInstance().EnqueueMessage(move(responses));
     return;
 }
 
@@ -226,6 +255,16 @@ void HandleTopic(unique_ptr<RequestMessage> message) {
     }
 
     Channel& channel = TIrcd::GetInstance().CreateOrGetChannel(channelName);
+
+    if (!channel.IsUserInChannel(sender)) {
+        response = make_unique<ResponseMessage>(
+            sender,
+            ResponseMessage::ResponseCode::ERR_NOTONCHANNEL,
+            vector<string>({channelName, "Not on channel"}));
+        TIrcd::GetInstance().EnqueueMessage(move(response));
+        return;
+    }
+
     if (params.size() == 1) {   // show topic of channel
         if (channel.HasTopic()) {
                 response = make_unique<ResponseMessage>(
@@ -310,11 +349,19 @@ void HandlePrivMsg(unique_ptr<RequestMessage> message) {
     shared_ptr<User> sender = message->GetSender();
     unique_ptr<ResponseMessage> response;
     if (params.size() < 2) {
-        response = make_unique<ResponseMessage>(
-            sender,
-            ResponseMessage::ResponseCode::ERR_NEEDMOREPARAMS,
-            vector<string>{"PRIVMSG", "Not enough parameters"});
-        TIrcd::GetInstance().EnqueueMessage(move(response));
+        if (params.size() == 1) {
+            response = make_unique<ResponseMessage>(
+                sender,
+                ResponseMessage::ResponseCode::ERR_NOTEXTTOSEND,
+                vector<string>{"PRIVMSG", "No text to send"});
+            TIrcd::GetInstance().EnqueueMessage(move(response));
+        } else if (params.size() == 0) {
+            response = make_unique<ResponseMessage>(
+                sender,
+                ResponseMessage::ResponseCode::ERR_NORECIPIENT,
+                vector<string>{"PRIVMSG", "No recipient given"});
+            TIrcd::GetInstance().EnqueueMessage(move(response));
+        }
         return;
     }
 
@@ -322,8 +369,16 @@ void HandlePrivMsg(unique_ptr<RequestMessage> message) {
     string content = params[1];
 
     if (target[0] == '#') { // send to channel
+        if (!TIrcd::GetInstance().IsChannelExists(target)) {
+            response = make_unique<ResponseMessage>(
+                sender,
+                ResponseMessage::ResponseCode::ERR_NOSUCHNICK,
+                vector<string>{target, "No such channel/nick"});
+            TIrcd::GetInstance().EnqueueMessage(move(response));
+            return;
+        }
+
         Channel& channel = TIrcd::GetInstance().CreateOrGetChannel(target);
-        
         unique_ptr<ResponseMessage> response = make_unique<ResponseMessage>(
             sender,
             channel.GetActiveUsers(),

@@ -203,6 +203,10 @@ bool TIrcd::IsNicknameInUse(string nickname) {
     return nickMap.find(nickname) != nickMap.end();
 }
 
+void TIrcd::UpdateNickMap(shared_ptr<User> pUser) {
+    nickMap[pUser->GetNickname()] = pUser;
+}
+
 int TIrcd::GetUsersCount() {
     return connectionMap.size();
 }
@@ -229,6 +233,15 @@ vector<Channel> TIrcd::GetChannelList() {
         channelList.push_back(*channel);
     }
     return channelList;
+}
+
+bool TIrcd::IsChannelExists(string channelName) {
+    for (auto& channel: channels) {
+        if (channel->GetChannelName() == channelName) {
+            return true;
+        }
+    }
+    return false;
 }
 
 int main(int argc, char* argv[]) {
