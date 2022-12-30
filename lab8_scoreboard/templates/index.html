@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>INP Lab#08 Scoreboard</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/5.1.2/echarts.min.js" integrity="sha512-ppWbHq6q2f7HAwS481w6qikuC0XEeBnmkRg6KWnWg3zSIbJwWWBgsCDMAxzSB7SVqXzWwSYQ2s8TSJKjnaikMg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    
+    <style>
+        .slidecontainer {
+            width: 100%; /* Width of the outside container */
+        }
+
+        /* The slider itself */
+        .slider {
+            -webkit-appearance: none;  /* Override default CSS styles */
+            appearance: none;
+            width: 100%; /* Full-width */
+            height: 25px; /* Specified height */
+            background: #d3d3d3; /* Grey background */
+            outline: none; /* Remove outline */
+            opacity: 0.7; /* Set transparency (for mouse-over effects on hover) */
+            -webkit-transition: .2s; /* 0.2 seconds transition on hover */
+            transition: opacity .2s;
+        }
+
+        /* Mouse-over effects */
+        .slider:hover {
+            opacity: 1; /* Fully shown on mouse-over */
+        }
+
+        /* The slider handle (use -webkit- (Chrome, Opera, Safari, Edge) and -moz- (Firefox) to override default look) */
+        .slider::-webkit-slider-thumb {
+            -webkit-appearance: none; /* Override default look */
+            appearance: none;
+            width: 25px; /* Set a specific slider handle width */
+            height: 25px; /* Slider handle height */
+            background: #04AA6D; /* Green background */
+            cursor: pointer; /* Cursor on hover */
+        }
+
+        .slider::-moz-range-thumb {
+            width: 25px; /* Set a specific slider handle width */
+            height: 25px; /* Slider handle height */
+            background: #04AA6D; /* Green background */
+            cursor: pointer; /* Cursor on hover */
+        }
+    </style>
+</head>
+<body>
+    <h1>Unofficial INP Lab #08 Scoreboard Visualization</h1>
+    <h3>by TwinkleStar03</h3>
+    <h3 id="loaded-submission"></h3>
+    <h5>Using the slider to select start time, click "Play" to see the running bars</h5>
+    <div class="slidecontainer">
+        <input type="range" min="1" max="1000" value="1600" class="slider" id="frame_selector">
+    </div>
+    <div class="slidecontainer">
+        <a id="update_interval_text">Play interval: 150ms</a>
+        <input type="range" min="10" max="2000" value="150" class="slider" id="update_interval">
+    </div>
+    <div class="setting-container">
+        <button id="play_toggle_button">Play</button>
+        <input type="range" min="1" max="40" value="15" id="display-items">
+        <a id="display-items-text">Displayed Team: 15</a>
+    </div>
+    
+    <div id="main"  style="width: 100%;height:600%;border-style:dashed;">
+        <center>Chart here!</center>
+    </div>
+    <script>
+        var updateFrequency = 50;
+        var chartDom = document.getElementById('main');
+        var myChart = echarts.init(chartDom);
+        var option;
+        var timestamps = {{ timestamps }};
+        var dataset = {{ dataset | safe }};
+
+        let startIndex = timestamps.length - 1;
+
+        document.getElementById('loaded-submission').innerHTML = 'Submissions by all teams: ' + timestamps.length;
+        document.getElementById('frame_selector').max = timestamps.length - 1;
+        document.getElementById('frame_selector').value = startIndex;
+        document.getElementById('display-items').max = dataset[timestamps[timestamps.length - 1]]['team_name'].length;
+
+        let is_playing = false;
+
+        option = {
+            tooltip: {
+                trigger: 'axis',
+                axisPointer: {
+                // Use axis to trigger tooltip
+                type: 'shadow' // 'shadow' as default; can also be 'line' or 'shadow'
+                }
+            },
+            legend: {
+            },
+            grid: {
+                left: '3%',
+                right: '4%',
+                bottom: '3%',
+                containLabel: true
+            },
+            xAxis: {
+                type: 'value',
+            },
+            yAxis: {
+                type: 'category',
+                inverse: true,
+                max: 15,
+                scale: false,
+                axisLabel: {
+                    show: true,
+                    rotate: 20,
+                    fontSize: 12,
+                    width: 100,
+                    overflow: 'truncate',
+                    ellipsis: '...'
+                },
+                animationDuration: 50,  
+                animationDurationUpdate: 50
+            },
+            dataset: {
+                source: {
+                    'team_name': ['Team A', 'Team B', 'Team C'],
+                    'success' : [120, 130, 213],
+                    'corrupted' : [150, 130, 0],
+                    'badsize' : [120, 130, 0]
+                }
+            },
+            series: [
+                {
+                    realtimeSort: false,
+                    name: 'Success (#)',
+                    color : 'rgba(50, 245, 80, 0.8)',
+                    type: 'bar',
+                    stack: 'total',
+                    label: {
+                        show: true
+                    },
+                    emphasis: {
+                        focus: 'series'
+                    },
+                    dimensions: ['team_name', 'success'],
+                },
+                {
+                    name: 'Corrupted (#)',
+                    color : 'rgba(250, 45, 50, 0.8)',
+                    type: 'bar',
+                    stack: 'total',
+                    label: {
+                        show: true
+                    },
+                    emphasis: {
+                        focus: 'series'
+                    },
+                    dimensions: ['team_name', 'corrupted'],
+                    
+                },
+                {
+                    name: 'Badsize (#)',
+                    color : 'rgba(245, 185, 50, 0.8)',
+                    type: 'bar',
+                    stack: 'total',
+                    label: {
+                        show: true
+                    },
+                    emphasis: {
+                        focus: 'series'
+                    },
+                    dimensions: ['team_name', 'badsize'],
+                },
+                {   
+                    name: 'Time Usage (s)',
+                    color : 'rgba(130, 190, 200, 0.8)',
+                    type: 'bar',
+                    label: {
+                        show: true
+                    },
+                    emphasis: {
+                        focus: 'series'
+                    },
+                    dimensions: ['team_name', 'elapsed'],
+                }
+            ],
+            // Disable init animation
+            animationDuration: 0,
+            animationDurationUpdate: updateFrequency,
+            animationEasing: 'linear',
+            animationEasingUpdate: 'linear',
+            graphic: {
+                elements: [
+                    {
+                        type: 'text',
+                        right: 160,
+                        bottom: 60,
+                        style: {
+                            text: 'timestamp',
+                            font: 'bolder 40px monospace',
+                            fill: 'rgba(100, 100, 100, 0.25)'
+                        },
+                        z: 100
+                    }
+                ]
+            }
+        };
+
+        option && myChart.setOption(option);
+
+        function updateDataset(timestamp) {
+            // TODO: update the dataset
+            let source = dataset[timestamp];
+            var datetime = new Date(timestamp * 1000);
+
+            option.dataset.source = source;
+            option.graphic.elements[0].style.text = datetime.toLocaleString();
+            myChart.setOption(option);
+        }
+        
+        var slider = document.getElementById("frame_selector");
+        var play_button = document.getElementById("play_toggle_button");
+        var update_interval = document.getElementById("update_interval");
+        var display_items = document.getElementById("display-items");
+        updateDataset(timestamps[slider.value]);
+
+        function play() {
+            startIndex = slider.value;
+            setTimeout(function() {
+                if (is_playing) {
+                    if (startIndex < timestamps.length - 1) {
+                        startIndex++;
+                        slider.value = startIndex;
+                        updateDataset(timestamps[startIndex]);
+                        play();
+                    } else {
+                        is_playing = false;
+                        document.getElementById('play_toggle_button').innerHTML = 'Play';
+                    }
+                }
+            }, updateFrequency);
+        }
+
+        slider.oninput = function() {
+            startIndex = this.value;
+            updateDataset(timestamps[startIndex]);
+        }
+        
+        update_interval.oninput = function() {
+            var text = document.getElementById("update_interval_text");
+            text.innerHTML = "Play interval: " + this.value + "ms";
+            updateFrequency = parseInt(this.value);
+        }
+
+        display_items.oninput = function() {
+            var text = document.getElementById("display-items-text");
+            text.innerHTML = "Displayed Team: " + (parseInt(this.value) + 1);
+            option.yAxis.max = parseInt(this.value);
+            myChart.setOption(option);
+            console.log(parseInt(option.yAxis.max));
+        }
+
+        play_button.onclick = function() {
+            if (is_playing) {
+                is_playing = false;
+                play_button.innerHTML = "Play";
+            } else {
+                is_playing = true;
+                play_button.innerHTML = "Pause";
+                play();
+            }
+        }
+
+        setTimeout(function() {
+            window.location.reload(1);
+        }, 600000);
+    </script>
+</body>
+</html>
