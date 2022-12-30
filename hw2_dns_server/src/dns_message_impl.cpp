@@ -9,17 +9,16 @@ DNSMessage::DNSMessage(char* buffer, size_t size) {
         questions.push_back(QuestionRecord(buffer + offset));
         offset += questions.back().Serialize().size();
     }
-    
     for (int i = 0; i < header.answer_count; i++) {
-        answers.push_back(ResourceRecord::Parse(buffer + offset, size - offset));
+        answers.push_back(ResourceRecord::Parse(buffer, offset));
         offset += answers.back().Serialize().size();
     }
     for (int i = 0; i < header.authorize_count; i++) {
-        authorities.push_back(ResourceRecord::Parse(buffer + offset, size - offset));
+        authorities.push_back(ResourceRecord::Parse(buffer, offset));
         offset += authorities.back().Serialize().size();
     }
     for (int i = 0; i < header.addition_count; i++) {
-        additional.push_back(ResourceRecord::Parse(buffer + offset, size - offset));
+        additional.push_back(ResourceRecord::Parse(buffer, offset));
         offset += additional.back().Serialize().size();
     }
 }

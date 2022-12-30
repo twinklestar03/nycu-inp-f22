@@ -1,4 +1,5 @@
 #pragma once
+#include <cstdint>
 #include <iostream>
 #include <vector>
 #include <map>
@@ -39,9 +40,9 @@ struct QuestionRecord {
     QuestionRecord(char* serialized);
     std::string Serialize();
 
-    std::string qname;
-    uint16_t qtype;
-    uint16_t qclass;
+    std::string qName;
+    uint16_t qType;
+    uint16_t qClass;
 };
 
 struct RData {
@@ -117,7 +118,7 @@ struct RDataTXT : public RData {
 
 struct ResourceRecord {
     ResourceRecord() = default;
-    static ResourceRecord Parse(char* buffer, size_t size);
+    static ResourceRecord Parse(char* buffer, size_t offset);
     std::string Serialize();
 
     std::string rName;
@@ -164,9 +165,9 @@ public:
 
     /* Protocol */
     void Work();
-    void HandleRequest(sockaddr* addr, DNSMessage& packet);
-    void SendResponse(sockaddr* addr, DNSMessage& packet);
-    void QueryFallbackNameserver(const DNSMessage& query, DNSMessage& response);
+    void HandleRequest(sockaddr* addr, DNSMessage& message);
+    void SendResponse(sockaddr* addr, DNSMessage& message);
+    void QueryFallbackNameserver(sockaddr* addr, DNSMessage& message);
 
     /* Configuration Parsing */
     void ParseConfigFile(char* file_path);
@@ -180,6 +181,8 @@ public:
     /* Helpers */
     // return comsumed size
     static size_t DecodeName(const char* src, char* dst);
+    // the decode function that can decompress the name, return comsumed size
+    static size_t DecodeName(const char* src, size_t offset, char* dst);
     // return the encoded name size
     static size_t EncodeName(const char* src, char* dst);
     static std::vector<std::string> SplitString(std::string str, char delim);
@@ -188,7 +191,10 @@ public:
 private:
     int serverFd;
     std::vector<int> clients;
-    std::map<std::string, std::vector<ResourceRecord>> zoneRecords;
+
+    // zoneName -> (recordType -> ResourceRecord)
+    std::map<std::string, std::map<uint16_t, std::vector<ResourceRecord>>> zoneRecords;
+    //std::map<std::string, std::vector<ResourceRecord>> zoneRecords;
 
     uint32_t fallbackServer;
 };

@@ -2,9 +2,11 @@
 #include <arpa/inet.h>
 #include <cstddef>
 #include <cstring>
+#include <ios>
 #include <iostream>
 #include <iomanip>
 #include <memory>
+#include <netinet/in.h>
 #include <ostream>
 #include <sstream>
 #include <sys/socket.h>
@@ -65,11 +67,11 @@ void TinyDNSd::ParseZoneFile(char* file_path) {
     // read whole line until \n
     while (fgets(line, 1024, file) != nullptr) {
         ResourceRecord record;
-        std::string name;
-        std::string cls;
-        std::string type;
-        uint32_t ttl;
-        char* rdata;
+        std::string rName;
+        std::string rClass;
+        std::string rType;
+        uint32_t rTTL;
+        std::string rdataConfig;
 
         // if /r/n is present in rdata, remove it
         if (line[strlen(line) - 2] == '\r') {
@@ -78,61 +80,68 @@ void TinyDNSd::ParseZoneFile(char* file_path) {
 
         record.config_string = line;
 
-        name = strtok(line, ",");
-        ttl = atoi(strtok(nullptr, ","));
-        cls = strtok(nullptr, ",");
-        type = strtok(nullptr, ",");
-        rdata = strtok(nullptr, ",");
+        rName = strtok(line, ",");
+        rTTL = atoi(strtok(nullptr, ","));
+        rClass = strtok(nullptr, ",");
+        rType = strtok(nullptr, ",");
+        rdataConfig = strtok(nullptr, ",");
 
-        std::cout << "RData: " << rdata << std::endl;
+        std::cout << "RData: " << rdataConfig << std::endl;
         
-        if (name == "@") {
+        if (rName == "@") {
             record.rName = strdup(zone_name.c_str());
         } else {
-            record.rName = strdup((name + "." + zone_name).c_str());
+            record.rName = strdup((rName + "." + zone_name).c_str());
         }
         
-        record.rTTL = ttl;
+        record.rTTL = rTTL;
         record.rClass = 1;
 
         // convert DNS type name into uint16_t
-        if (type == "A") {
+        if (rType == "A") {
             record.rType = DNS_TYPE_A;
-            record.rData = std::make_shared<RDataA>(rdata);
-        } else if (type == "NS") {
+            record.rData = std::make_shared<RDataA>(rdataConfig);
+            zoneRecords[zone_name][DNS_TYPE_A].push_back(record);
+        } else if (rType == "NS") {
             record.rType = DNS_TYPE_NS;
-            record.rData = std::make_shared<RDataNS>(rdata);
-        } else if (type == "CNAME") {
+            record.rData = std::make_shared<RDataNS>(rdataConfig);
+            zoneRecords[zone_name][DNS_TYPE_NS].push_back(record);
+        } else if (rType == "CNAME") {
             record.rType = DNS_TYPE_CNAME;
-            record.rData = std::make_shared<RDataCNAME>(rdata);
-        } else if (type == "SOA") {
+            record.rData = std::make_shared<RDataCNAME>(rdataConfig);
+            zoneRecords[zone_name][DNS_TYPE_CNAME].push_back(record);
+        } else if (rType == "SOA") {
             record.rType = DNS_TYPE_SOA;
-            record.rData = std::make_shared<RDataSOA>(rdata);
-        } else if (type == "MX") {
+            record.rData = std::make_shared<RDataSOA>(rdataConfig);
+            zoneRecords[zone_name][DNS_TYPE_SOA].push_back(record);
+        } else if (rType == "MX") {
             record.rType = DNS_TYPE_MX;
-            record.rData = std::make_shared<RDataMX>(rdata);
-        } else if (type == "TXT") {
+            record.rData = std::make_shared<RDataMX>(rdataConfig);
+            zoneRecords[zone_name][DNS_TYPE_MX].push_back(record);
+        } else if (rType == "TXT") {
             record.rType = DNS_TYPE_TXT;
-            record.rData = std::make_shared<RDataTXT>(rdata);
-        } else if (type == "AAAA") {
+            record.rData = std::make_shared<RDataTXT>(rdataConfig);
+            zoneRecords[zone_name][DNS_TYPE_TXT].push_back(record);
+        } else if (rType == "AAAA") {
             record.rType = DNS_TYPE_AAAA;
-            record.rData = std::make_shared<RDataAAAA>(rdata);
+            record.rData = std::make_shared<RDataAAAA>(rdataConfig);
+            zoneRecords[zone_name][DNS_TYPE_AAAA].push_back(record);
         } else {
-            std::cerr << "[-] [TinyDNSd::ParseZoneFile] Unknown DNS type: " << type << std::endl;
+            std::cerr << "[-] [TinyDNSd::ParseZoneFile] Unknown DNS type: " << rType << std::endl;
             continue;
-        }
-        
-        zoneRecords[zone_name].push_back(record);
+        }   
     }
 
     fclose(file);
 }
 
 void TinyDNSd::PrintResourceRecords() {
-    for (auto it = zoneRecords.begin(); it != zoneRecords.end(); it++) {
-        std::cerr << it->first << std::endl;
-        for (auto &record : it->second) {
-            PrintResourceRecord(record);
+    for (auto zoneIt = zoneRecords.begin(); zoneIt != zoneRecords.end(); zoneIt++) {
+        std::cerr << zoneIt->first << std::endl;
+        for (auto typeIt = zoneIt->second.begin(); typeIt != zoneIt->second.end(); typeIt++) {
+            for (auto recordIt = typeIt->second.begin(); recordIt != typeIt->second.end(); recordIt++) {
+                PrintResourceRecord(*recordIt);
+            }
         }
         std::cerr << "----------------" << std::endl;
     }
@@ -205,8 +214,123 @@ void TinyDNSd::Work() {
     HandleRequest((sockaddr*) &addr, *packet);
 }
 
-void TinyDNSd::HandleRequest(sockaddr* addr, DNSMessage& packet) {
-    
+void TinyDNSd::HandleRequest(sockaddr* addr, DNSMessage& message) {
+    std::cerr << "[*] [TinyDNSd::HandleRequest] Handling request" << std::endl;
+
+    // if it's request
+    if ((message.header.flags >> DNS_QR_FIELD) & 1) {
+        std::cerr << "[-] [TinyDNSd::HandleRequest] It's not a request" << std::endl;
+        return;
+    }
+
+    DNSMessage responseMessage = DNSMessage(message);
+    auto &question = message.questions[0];
+    const std::string& qName = question.qName;
+    const uint16_t qType = question.qType;
+
+    // THIS IMPLEMENTATION IS WRONG. Sub-domain query is not supported
+    // We should build a record tree to query the record and vise versa
+    std::string zone_name;
+    std::stringstream ss(qName);
+    std::vector<std::string> tokens;
+    bool nsPresent = false;
+    while (std::getline(ss, zone_name, '.')) {
+        tokens.push_back(zone_name);
+    }
+
+    // FORMERR
+    if (tokens.size() < 2 || message.questions.size() > 1) {
+        QueryFallbackNameserver(addr, message);
+        return;
+    }
+
+    // nip.io like service 
+    if (tokens.size() == 7) {
+        std::string ip = tokens[0] + "." + tokens[1] + "." + tokens[2] + "." + tokens[3];
+        std::string domain = tokens[4] + "." + tokens[5] + "." + tokens[6];
+
+        std::cerr << "[*] [TinyDNSd::HandleRequest] Nip.io like service: " << ip << " " << domain << std::endl;
+
+        responseMessage.header.flags = (1 << DNS_QR_FIELD) | (1 << DNS_AA_FIELD);
+        responseMessage.header.answer_count = 1;
+        responseMessage.header.authorize_count = 0;
+
+        ResourceRecord record;
+        record.rName = qName;
+        record.rTTL = 1;
+        record.rClass = 1;
+        record.rType = 1;
+        record.rData = std::make_shared<RDataA>(ip);
+        responseMessage.answers.push_back(record);
+        SendResponse(addr, responseMessage);
+        return;
+    }
+
+    zone_name = tokens[tokens.size() - 2] + "." + tokens[tokens.size() - 1];
+
+    // check if we have such zone
+    if (zoneRecords.find(zone_name) == zoneRecords.end()) {
+        std::cerr << "[/] [TinyDNSd::HandleRequest] Going fallback server. No such zone: " << zone_name << std::endl;
+        // TODO: Do fallback server query
+        QueryFallbackNameserver(addr, message);
+        return;
+    }
+
+    // set flags
+    responseMessage.header.flags = (1 << DNS_QR_FIELD) | (1 << DNS_AA_FIELD);
+    responseMessage.header.answer_count = 0;
+    responseMessage.header.authorize_count = 0;
+
+    // check if we have such record
+    for (auto &record : zoneRecords[zone_name][qType]) {
+        if (record.rName == qName && record.rType == qType) {
+            std::cerr << "[*] [TinyDNSd::HandleRequest] Found record" << std::endl;
+            responseMessage.header.answer_count++;
+            responseMessage.answers.push_back(record);
+
+            // Dealing with additional records
+            std::string domain;
+            if (record.rType == DNS_TYPE_CNAME || record.rType == DNS_TYPE_NS || record.rType == DNS_TYPE_MX) {
+                switch (qType) {
+                    case DNS_TYPE_CNAME:
+                        domain = reinterpret_cast<RDataCNAME*>(record.rData.get())->cname;
+                        domain = domain.substr(0, domain.size() - 1);
+                        break;
+                    case DNS_TYPE_NS:
+                        domain = reinterpret_cast<RDataNS*>(record.rData.get())->nsdname;
+                        domain = domain.substr(0, domain.size() - 1);
+                        nsPresent = true;
+                        break;
+                    case DNS_TYPE_MX:
+                        domain = reinterpret_cast<RDataMX*>(record.rData.get())->exchange;
+                        domain = domain.substr(0, domain.size() - 1);
+                        break;
+                }
+
+                for (auto &record : zoneRecords[zone_name][DNS_TYPE_A]) {
+                    if (record.rName == domain) {
+                        std::cerr << "[*] [TinyDNSd::HandleRequest] Found additional record" << std::endl;
+                        responseMessage.header.addition_count++;
+                        responseMessage.additional.push_back(record);
+                    }
+                }
+            }
+        }
+    }
+
+    // add authority records
+    if (responseMessage.header.answer_count == 0) {
+        std::cerr << "[*] [TinyDNSd::HandleRequest] No records found. Adding SOA records" << std::endl;
+        responseMessage.header.authorize_count++;
+        responseMessage.authorities.push_back(zoneRecords[zone_name][DNS_TYPE_SOA][0]);
+    } else if (!nsPresent) {
+        std::cerr << "[*] [TinyDNSd::HandleRequest] Records found. Adding NS records" << std::endl;
+        responseMessage.header.authorize_count++;
+        responseMessage.authorities.push_back(zoneRecords[zone_name][DNS_TYPE_NS][0]);
+    }
+
+    // send response
+    SendResponse(addr, responseMessage);
 }
 
 void TinyDNSd::SendResponse(sockaddr* addr, DNSMessage& packet) {
@@ -219,6 +343,45 @@ void TinyDNSd::SendResponse(sockaddr* addr, DNSMessage& packet) {
     }
 
     std::cerr << "[*] [TinyDNSd::SendResponse] Sent " << bytes << " bytes" << std::endl;
+}
+
+void TinyDNSd::QueryFallbackNameserver(sockaddr* clientAddr, DNSMessage &message) {
+    int sockFd;
+    char buffer[1024];
+    size_t bytes;
+    sockaddr_in serverAddr;
+    std::string serialized;
+    
+    sockFd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (sockFd == -1) {
+        std::cerr << "[-] [TinyDNSd::QueryFallbackNameserver] Failed to create socket" << std::endl;
+        return;
+    }
+
+    memset(&serverAddr, 0, sizeof(sockaddr));
+    serverAddr.sin_family = AF_INET;
+    serverAddr.sin_port = htons(53);
+    serverAddr.sin_addr.s_addr = fallbackServer;
+
+    serialized = message.Serialize();
+    bytes = sendto(sockFd, serialized.data(), serialized.size(), 0, (sockaddr*)&serverAddr, sizeof(sockaddr_in));
+    if (bytes == -1) {
+        std::cerr << "[-] [TinyDNSd::QueryFallbackNameserver] Failed to send request" << std::endl;
+        return;
+    }
+
+    std::cerr << "[*] [TinyDNSd::QueryFallbackNameserver] Sent " << bytes << " bytes" << std::endl;
+
+    bytes = recvfrom(sockFd, buffer, 1024, 0, NULL, NULL);
+    if (bytes == -1) {
+        std::cerr << "[-] [TinyDNSd::QueryFallbackNameserver] Failed to receive response" << std::endl;
+        return;
+    }
+
+    std::cerr << "[*] [TinyDNSd::QueryFallbackNameserver] Received " << bytes << " bytes" << std::endl;
+    sendto(serverFd, buffer, bytes, 0, clientAddr, sizeof(sockaddr_in));
+
+    return;
 }
 
 size_t TinyDNSd::DecodeName(const char* src, char* dst) {
@@ -237,6 +400,19 @@ size_t TinyDNSd::DecodeName(const char* src, char* dst) {
 
     strcpy(dst, name.c_str());
     return offset + 1;
+}
+
+size_t TinyDNSd::DecodeName(const char* src, size_t offset, char* dst) {
+    int8_t part_len = src[offset];
+
+    // if first two bit are set, then this is a pointer
+    if ((part_len & 0xC0) == 0xC0) {
+        uint16_t pointer = (part_len & 0x3F) << 8 | src[offset + 1];
+        DecodeName(src + pointer, dst);
+        return 2;
+    }
+
+    return DecodeName(src + offset, dst);
 }
 
 size_t TinyDNSd::EncodeName(const char* src, char* dst) {

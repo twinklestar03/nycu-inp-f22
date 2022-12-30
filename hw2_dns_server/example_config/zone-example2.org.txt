@@ -1,0 +1,4 @@
+example2.org.
+@,3600,IN,SOA,dns.example2.org. admin.example2.org. 2022121301 3600 300 3600000 3600
+@,3600,IN,NS,dns.example2.org.
+dns,3600,IN,A,140.113.130.1

@@ -1,6 +1,7 @@
 #include "tiny_dns.h"
 
 #include <cstdint>
+#include <cstring>
 #include <memory>
 #include <netinet/in.h>
 #include <sstream>
@@ -12,14 +13,14 @@ QuestionRecord::QuestionRecord(char* serialized) {
     size_t offset = 0;
 
     len += TinyDNSd::DecodeName(serialized, buffer);
-    qname = buffer;
+    qName = buffer;
     offset += len;
 
-    qtype = ntohs(*(uint16_t*)(serialized + offset));
+    qType = ntohs(*(uint16_t*)(serialized + offset));
     offset += sizeof(uint16_t);
-    qclass = ntohs(*(uint16_t*)(serialized + offset));
+    qClass = ntohs(*(uint16_t*)(serialized + offset));
 
-    std::cout << "QuestionRecord: " << qname << " " << qtype << " " << qclass << std::endl;
+    std::cout << "QuestionRecord: " << qName << " " << qType << " " << qClass << std::endl;
 }
 
 std::string QuestionRecord::Serialize() {
@@ -27,12 +28,12 @@ std::string QuestionRecord::Serialize() {
     size_t offset = 0;
     size_t len = 0;
 
-    len = TinyDNSd::EncodeName(qname.c_str(), buffer);
+    len = TinyDNSd::EncodeName(qName.c_str(), buffer);
     offset += len;
 
-    *(uint16_t*)(buffer + offset) = htons(qtype);
+    *(uint16_t*)(buffer + offset) = htons(qType);
     offset += sizeof(uint16_t);
-    *(uint16_t*)(buffer + offset) = htons(qclass);
+    *(uint16_t*)(buffer + offset) = htons(qClass);
     offset += sizeof(uint16_t);
 
     return std::string(buffer, offset);
@@ -48,10 +49,12 @@ RDataAAAA::RDataAAAA(char *serialized) {
 
 std::string RDataAAAA::Serialize() {
     char buffer[INET6_ADDRSTRLEN];
+    memcpy(buffer, &address, sizeof(uint32_t) * 4);
     return { buffer, 16 };
 }
 
 RDataA::RDataA(std::string data) {
+    std::cout << "Parsing A record: " << data << std::endl;
     inet_pton(AF_INET, data.c_str(), &address);
 }
 
@@ -231,12 +234,11 @@ std::string ResourceRecord::Serialize() {
     return std::string(buffer, offset);
 }
 
-ResourceRecord ResourceRecord::Parse(char *buffer, size_t size) {
+ResourceRecord ResourceRecord::Parse(char *buffer, size_t offset) {
     ResourceRecord rr;
-    size_t offset = 0;
     char tmp[1024];
 
-    offset += TinyDNSd::DecodeName(buffer, tmp);
+    offset += TinyDNSd::DecodeName(buffer, offset, tmp);
     rr.rName = tmp;
 
     rr.rType = ntohs(*((uint16_t*) (buffer + offset)));
