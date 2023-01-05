@@ -1,0 +1,10 @@
+demo1.org.
+@,3600,IN,SOA,dns1.demo1.org. admin.demo1.org. 2023010502 3600 300 3600000 3600
+@,3600,IN,NS,dns1.demo1.org.
+@,3600,IN,NS,dns2.demo1.org.
+@,3600,IN,MX,10 mail.demo1.org.
+dns1,3600,IN,A,140.113.123.1
+dns2,3600,IN,A,140.113.123.2
+mail,3600,IN,A,140.113.123.123
+www,300,IN,A,140.113.123.81
+www2,300,IN,CNAME,www.demo1.org.

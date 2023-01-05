@@ -1,0 +1,7 @@
+demo2.org.
+@,3600,IN,SOA,dns.demo2.org. admin.demo2.org. 2023010502 3600 300 3600000 3600
+@,3600,IN,NS,dns.demo2.org.
+@,3600,IN,TXT,"Th1s_1s_D3m0_2_230105."
+dns,3600,IN,A,140.113.23.1
+www,300,IN,A,140.113.23.81
+www,300,IN,AAAA,2001:f18:113:23::80

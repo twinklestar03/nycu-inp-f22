@@ -22,7 +22,7 @@ OBJS    := $(SRCS)
 DEPS := $(OBJS:%.cpp=%.d)
 OBJS := $(OBJS:%.cpp=%.o)
 
-EXE     := tinydnsd
+EXE     := $(BIN)/tinydnsd
 
 .PHONY: all run clean
 

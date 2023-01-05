@@ -319,14 +319,18 @@ void TinyDNSd::HandleRequest(sockaddr* addr, DNSMessage& message) {
     }
 
     // add authority records
-    if (responseMessage.header.answer_count == 0) {
+    if (qType == DNS_TYPE_SOA) {
+        // No additional records
+    } else if (responseMessage.header.answer_count == 0) {
         std::cerr << "[*] [TinyDNSd::HandleRequest] No records found. Adding SOA records" << std::endl;
         responseMessage.header.authorize_count++;
         responseMessage.authorities.push_back(zoneRecords[zone_name][DNS_TYPE_SOA][0]);
     } else if (!nsPresent) {
         std::cerr << "[*] [TinyDNSd::HandleRequest] Records found. Adding NS records" << std::endl;
-        responseMessage.header.authorize_count++;
-        responseMessage.authorities.push_back(zoneRecords[zone_name][DNS_TYPE_NS][0]);
+        for (auto &record : zoneRecords[zone_name][DNS_TYPE_NS]) {
+            responseMessage.header.authorize_count++;
+            responseMessage.authorities.push_back(record);
+        }
     }
 
     // send response
@@ -477,13 +481,13 @@ void TinyDNSd::HexDump(const char *buffer, size_t size) {
 }
 
 int main(int argc, char* argv[]) {
-    if (argc != 2) {
-        std::cerr << "Usage: " << argv[0] << " <config>" << std::endl;
+    if (argc != 3) {
+        std::cerr << "Usage: " << argv[0] << " <config> <port>" << std::endl;
         return 1;
     }
 
     TinyDNSd dns(argv[1]);
-    dns.Run(53);
+    dns.Run(atoi(argv[2]));
 
     return 0;
 }

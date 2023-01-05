@@ -3,3 +3,6 @@ bin
 .gdb_history
 
 .vscode
+
+*.d
+*.o
